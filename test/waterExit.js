@@ -12,7 +12,7 @@ function movementsFor (blocks) {
   movements.getBlock = (node, dx, dy, dz) => {
     const position = new Vec3(node.x + dx, node.y + dy, node.z + dz)
     const kind = blocks[`${position.x},${position.y},${position.z}`] || 'air'
-    return { position, type: kind, physical: kind === 'stone', liquid: kind === 'water', safe: kind !== 'stone' }
+    return { position, type: kind, physical: kind === 'stone', liquid: kind === 'water' || kind === 'lava', safe: kind !== 'stone' && kind !== 'lava' }
   }
   movements.safeOrBreak = block => block.safe ? 0 : 100
   return movements
@@ -40,5 +40,26 @@ describe('water exit movements', () => {
     const neighbors = []
     movements.getMoveWaterExit(start, neighbors)
     assert.strictEqual(neighbors.length, 0)
+  })
+
+  it('does not swim up from water into lava', () => {
+    const movements = movementsFor({ '0,0,0': 'water', '0,1,0': 'lava' })
+    const neighbors = []
+    movements.getMoveWaterExit(start, neighbors)
+    assert.ok(!neighbors.some(n => n.x === 0 && n.y === 1 && n.z === 0))
+  })
+
+  it('does not plan any exit with lava at head height', () => {
+    const movements = movementsFor({ '0,0,0': 'water', '0,1,0': 'water', '0,2,0': 'lava', '1,0,0': 'stone' })
+    const neighbors = []
+    movements.getMoveWaterExit(start, neighbors)
+    assert.strictEqual(neighbors.length, 0)
+  })
+
+  it('still climbs out of lava onto a shore', () => {
+    const movements = movementsFor({ '0,0,0': 'lava', '1,0,0': 'stone' })
+    const neighbors = []
+    movements.getMoveWaterExit(start, neighbors)
+    assert.ok(neighbors.some(n => n.x === 1 && n.y === 1 && n.z === 0))
   })
 })
