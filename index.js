@@ -163,6 +163,9 @@ function inject (bot) {
     // next goal and stop that one instead.
     if (!stateGoal && path.length === 0) return
     stopPathing = true
+    // With no path there is no next node to wait for, so stop now. Otherwise the flag waits for
+    // the next goal and stops that one instead.
+    if (path.length === 0) resetPath('stop')
   }
 
   bot.on('physicsTick', monitorMovement)
