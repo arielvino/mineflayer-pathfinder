@@ -392,6 +392,33 @@ describe('pathfinder events', function () {
       bot.once('path_stop', () => done())
       bot.pathfinder.stop()
     })
+
+    it('path_stop fires at once when a goal is set but no path is running', function (done) {
+      this.timeout(1000)
+      // A dynamic goal the bot already stands in: it stays set, and the path stays empty.
+      bot.pathfinder.setGoal(new goals.GoalNear(spawnPos.x, spawnPos.y, spawnPos.z, 2), true)
+      bot.once('physicsTick', () => {
+        assert.strictEqual(bot.pathfinder.isMoving(), false)
+        assert.ok(bot.pathfinder.goal)
+        bot.once('path_stop', () => {
+          assert.strictEqual(bot.pathfinder.goal, null)
+          done()
+        })
+        bot.pathfinder.stop()
+      })
+    })
+
+    it('stop() with no path running does not cancel the next goal', function (done) {
+      this.timeout(1000)
+      bot.pathfinder.setGoal(new goals.GoalNear(spawnPos.x, spawnPos.y, spawnPos.z, 2), true)
+      bot.once('physicsTick', () => {
+        bot.pathfinder.stop()
+        const next = new goals.GoalNear(targetBlock.x, targetBlock.y, targetBlock.z, 1)
+        bot.pathfinder.setGoal(next)
+        assert.strictEqual(bot.pathfinder.goal, next)
+        done()
+      })
+    })
   })
 })
 
