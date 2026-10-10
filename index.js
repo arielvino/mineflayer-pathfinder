@@ -478,6 +478,10 @@ function inject (bot) {
             bot.emit('goal_reached', stateGoal)
             stateGoal = null
             fullStop()
+          } else {
+            // Inside a dynamic goal: if something moves the bot out of it again
+            // (knockback, a push), the goal hasn't moved, so plan anew from there.
+            pathUpdated = false
           }
         } else if (!pathUpdated) {
           const results = bot.pathfinder.getPathTo(stateMovements, stateGoal)
