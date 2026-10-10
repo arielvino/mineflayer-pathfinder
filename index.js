@@ -135,7 +135,7 @@ function inject (bot) {
     lockUseBlock.release()
     stateMovements.clearCollisionIndex()
     if (clearStates) bot.clearControlStates()
-    if (stopPathing) return stop()
+    if (stopPathing) return stop(reason === 'stop')
   }
 
   bot.pathfinder.setGoal = (goal, dynamic = false) => {
@@ -400,11 +400,15 @@ function inject (bot) {
     return true
   }
 
-  function stop () {
+  function stop (emitLater = false) {
     stopPathing = false
     stateGoal = null
     path = []
-    bot.emit('path_stop')
+    // Called from bot.pathfinder.stop() itself (nothing was running), path_stop waits for the
+    // next tick, as it does when a running path stops at its next node: callers subscribe to it
+    // after stop() returns.
+    if (emitLater) process.nextTick(() => bot.emit('path_stop'))
+    else bot.emit('path_stop')
     fullStop()
   }
 
