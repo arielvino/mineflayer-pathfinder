@@ -408,6 +408,17 @@ describe('pathfinder events', function () {
       })
     })
 
+    it('path_stop reaches a listener added after stop() returns, with the goal already cleared', function (done) {
+      this.timeout(1000)
+      // mineflayer-pvp does this: pathfinder.stop(), then wait for path_stop.
+      bot.pathfinder.setGoal(new goals.GoalNear(spawnPos.x, spawnPos.y, spawnPos.z, 2), true)
+      bot.once('physicsTick', () => {
+        bot.pathfinder.stop()
+        assert.strictEqual(bot.pathfinder.goal, null)
+        bot.once('path_stop', () => done())
+      })
+    })
+
     it('stop() with no path running does not cancel the next goal', function (done) {
       this.timeout(1000)
       bot.pathfinder.setGoal(new goals.GoalNear(spawnPos.x, spawnPos.y, spawnPos.z, 2), true)
