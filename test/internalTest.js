@@ -56,6 +56,32 @@ function trenchMap (Version) {
 }
 
 /**
+ * A one-wide corridor running south (+z) at x=8, floor at y=50, walled in up to y=56. North of
+ * the spawn cell (z=2) a one-block step (z=1); south of it a two-high wall that is the corridor
+ * floor onward. The only route: step up onto z=1, then a parkour jump-up south over the spawn
+ * cell onto z=3.
+ * @param {string} Version version
+ * @returns {import('prismarine-chunk').Chunk}
+ */
+function stepBackMap (Version) {
+  const Block = require('prismarine-block')(Version)
+  const Chunk = require('prismarine-chunk')(Version)
+  const mcData = require('minecraft-data')(Version)
+  const stone = () => new Block(mcData.blocksByName.stone.id, 1, 0)
+  const air = () => new Block(mcData.blocksByName.air.id, 1, 0)
+  const chunk = new Chunk()
+  chunk.initialize((x, y, z) => {
+    if (y <= 50) return stone()
+    if (y > 56) return air()
+    if (x !== 8 || z === 0) return stone()
+    if (z === 1) return y === 51 ? stone() : air()
+    if (z === 2) return air()
+    return y <= 52 ? stone() : air()
+  })
+  return chunk
+}
+
+/**
  * Reads the schematic parkour1.schem and returns a chunk containing the schematic content.
  * @param {string} Version version to be used
  * @returns {Promise<import('prismarine-chunk').Chunk>}
@@ -1658,5 +1684,57 @@ describe('human walker on an island', function () {
     assert.strictEqual(p.y, goal.y)
     assert.ok(human.route.some(w => w.y === 54), `route ${human.route} did not go through the trench floor`)
     assert.ok(human.route[human.route.length - 1].equals(goal), 'route must end at the goal')
+  })
+})
+
+describe('a step up followed by a jump back over the bot\'s own cell', function () {
+  const spawnPos = new Vec3(8.5, 51, 2.3) // pressed against the step, as the walk leaves it
+  const step = new Vec3(8.5, 52, 1.5)
+
+  let bot
+  let server
+
+  before(async () => {
+    server = await newServer(server, stepBackMap(Version), spawnPos, Version, true)
+    bot = mineflayer.createBot({
+      username: 'player',
+      version: Version,
+      port: ServerPort
+    })
+    await once(bot, 'chunkColumnLoad')
+    bot.loadPlugin(pathfinder)
+    const movements = new Movements(bot)
+    movements.canDig = false
+    movements.allow1by1towers = false
+    bot.pathfinder.setMovements(movements)
+  })
+  after(() => {
+    bot.pathfinder.setGoal(null)
+    server.close()
+  })
+
+  it('keeps heading for the step when the plan updates mid-jump', async function () {
+    await once(bot, 'physicsTick')
+    // Ticks are driven by hand from here: the bot holds still at the positions set below.
+    bot.physicsEnabled = false
+    bot.entity.position = spawnPos.clone()
+    bot.entity.onGround = true
+    // A search that takes many ticks, so its partial plans are continued on later ticks.
+    bot.pathfinder.tickTimeout = 0.02
+    const updates = []
+    bot.on('path_update', (r) => updates.push(r))
+    bot.pathfinder.setGoal(new goals.GoalNear(8, 53, 12, 1))
+    for (let i = 0; i < 10 && !(updates.length && updates[updates.length - 1].path.length); i++) bot.emit('physicsTick')
+    const first = updates[updates.length - 1]
+    assert.ok(first?.status === 'partial' && first.path[0].equals(step), `first plan does not start at the step: ${first?.path}`)
+
+    // The executor jumps toward the step; the next plan update lands with the bot in the air,
+    // closer to the node after the step than the step is to it, but it hasn't reached the step.
+    bot.entity.position = new Vec3(8.5, 51.42, 2.3)
+    bot.entity.onGround = false
+    const seen = updates.length
+    bot.emit('physicsTick')
+    assert.ok(updates.length > seen, 'no plan update on the mid-jump tick')
+    assert.ok(updates[updates.length - 1].path[0].equals(step), `skipped the step: heading for ${updates[updates.length - 1].path[0]}`)
   })
 })
