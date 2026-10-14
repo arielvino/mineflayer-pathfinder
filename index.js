@@ -413,6 +413,14 @@ function inject (bot) {
     return true
   }
 
+  // In water the bot holds jump and floats with its face at the surface. A route that goes down,
+  // or under a solid block where a floating bot's head would be, needs it to sink instead:
+  // holding jump there keeps it bobbing against the face of the overhang.
+  function mustSink (next, pos) {
+    if (next.y < Math.floor(pos.y)) return true
+    return stateMovements.getBlock(next, 0, 2, 0).physical
+  }
+
   function stop (emitLater = false) {
     stopPathing = false
     stateGoal = null
@@ -644,7 +652,7 @@ function inject (bot) {
 
     if (bot.entity.isInWater) {
       if (Math.abs(dx) <= 0.35 && Math.abs(dz) <= 0.35) bot.setControlState('forward', false)
-      bot.setControlState('jump', true)
+      bot.setControlState('jump', !mustSink(nextPoint, p))
       bot.setControlState('sprint', false)
     } else if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
       bot.setControlState('jump', false)
