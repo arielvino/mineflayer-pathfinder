@@ -217,8 +217,21 @@ function inject (bot) {
     return newPath
   }
 
-  function pathFromPlayer (path) {
+  function pathFromPlayer (path, heading) {
     if (path.length === 0) return
+    // A plan that is still being computed starts where the bot stood when planning
+    // began. If it still holds the node the bot is heading for, resume there: the
+    // bot hasn't reached that node yet (reached nodes are shifted off as it goes).
+    // Guessing from distances instead skips a step-up the bot is jumping toward when
+    // the next node lies back across its own cell, and it then hops in place under a
+    // node it can't reach.
+    if (heading) {
+      const i = path.findIndex(n => n.x === heading.x && n.y === heading.y && n.z === heading.z)
+      if (i >= 0) {
+        path.splice(0, i)
+        return
+      }
+    }
     let minI = 0
     let minDistance = 1000
     for (let i = 0; i < path.length; i++) {
@@ -459,7 +472,7 @@ function inject (bot) {
     if (astarContext && astartTimedout) {
       const results = astarContext.compute()
       results.path = postProcessPath(results.path)
-      pathFromPlayer(results.path)
+      pathFromPlayer(results.path, path[0])
       bot.emit('path_update', results)
       path = results.path
       astartTimedout = results.status === 'partial'
