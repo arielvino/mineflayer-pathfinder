@@ -665,7 +665,11 @@ function inject (bot) {
     bot.setControlState('jump', false)
 
     if (bot.entity.isInWater) {
-      if (Math.abs(dx) <= 0.35 && Math.abs(dz) <= 0.35) bot.setControlState('forward', false)
+      // Rising to a higher node, keep steering until the whole body (0.6 wide) is inside the
+      // node's column: 0.35 off centre leaves it under the neighbour's ceiling, where a current
+      // holds it and jump can't lift it.
+      const near = nextPoint.y > Math.floor(p.y) ? 0.15 : 0.35
+      if (Math.abs(dx) <= near && Math.abs(dz) <= near) bot.setControlState('forward', false)
       bot.setControlState('jump', !mustSink(nextPoint, p))
       bot.setControlState('sprint', false)
     } else if (stateMovements.allowSprinting && physics.canStraightLine(path, true)) {
