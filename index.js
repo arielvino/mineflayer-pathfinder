@@ -418,7 +418,17 @@ function inject (bot) {
   // holding jump there keeps it bobbing against the face of the overhang.
   function mustSink (next, pos) {
     if (next.y < Math.floor(pos.y)) return true
+    // Rising to a higher node: the body fits under a ceiling over it (that's 2 above
+    // the node), and only swimming up gets it there.
+    if (next.y > Math.floor(pos.y)) return false
     return stateMovements.getBlock(next, 0, 2, 0).physical
+  }
+
+  // In water, a stop (to dig, to place) keeps jump held so the bot holds its depth
+  // instead of sinking, unless the route goes down. (Not mustSink: a ceiling over the
+  // next node is what the dig is about to break.)
+  function holdInWater (next) {
+    if (bot.entity.isInWater) bot.setControlState('jump', next.y >= Math.floor(bot.entity.position.y))
   }
 
   function stop (emitLater = false) {
@@ -522,13 +532,15 @@ function inject (bot) {
     const p = bot.entity.position
 
     // Handle digging
+    // A floating bot is never on the ground: in water it digs from where it floats.
     if (digging || nextPoint.toBreak.length > 0) {
-      if (!digging && bot.entity.onGround) {
+      if (!digging && (bot.entity.onGround || bot.entity.isInWater)) {
         digging = true
         const b = nextPoint.toBreak.shift()
         const block = bot.blockAt(new Vec3(b.x, b.y, b.z), false)
         const tool = bot.pathfinder.bestHarvestTool(block)
         fullStop()
+        holdInWater(nextPoint)
 
         const digBlock = () => {
           bot.dig(block, true)
@@ -558,6 +570,7 @@ function inject (bot) {
         placing = true
         placingBlock = nextPoint.toPlace.shift()
         fullStop()
+        holdInWater(nextPoint)
       }
 
       // Open gates or doors
@@ -640,6 +653,7 @@ function inject (bot) {
       nextPoint = path[0]
       if (nextPoint.toBreak.length > 0 || nextPoint.toPlace.length > 0) {
         fullStop()
+        holdInWater(nextPoint)
         return
       }
       dx = nextPoint.x - p.x
